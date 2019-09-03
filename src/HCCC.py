@@ -12,11 +12,13 @@ from keras import layers
 from matplotlib import pyplot as plt
 from keras.utils import to_categorical
 
-#step = 1246991  # 全局变量，每次处理step个图片，防止占用太多内存，可以根据实际情况更改
-step = 1000  # 全局变量，每次处理step个图片，防止占用太多内存，可以根据实际情况更改
+# step = 1246991  # 全局变量，每次处理step个图片，防止占用太多内存，可以根据实际情况更改
+step = 3728  # 全局变量，每次处理step个图片，防止占用太多内存，可以根据实际情况更改
 threshold = 220  # 二值图阈值
 TargetSize = 64  # 目标图片的边长
+times = 100  # 迭代次数
 
+# 从数据集中提取部分样本
 def GetPictures(gnt, imgs, labels):
     i = 0
     for img, label in gnt:
@@ -25,11 +27,20 @@ def GetPictures(gnt, imgs, labels):
         imgs[i] = img
         labels[i] = label
         i = i + 1
-        
+
+# 将灰度图转为二值图    
 def Gray2binary(table, img):
     img = img.convert('P')
     img = img.point(table, '1')
     return img
+
+# 处理中文标签
+def StrL2IntL(labels, labels_str):
+    if labels[i] in labels_str:
+        labels[i] = labels_str.index(labels[i])
+    else:
+        labels_str.append(labels[i])
+        labels[i] = len(labels_str) - 1
 
 plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
 plt.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
@@ -45,7 +56,11 @@ gnt = GNT(Z, set_name)  # gnt即包含了目标数据集中的所有数据，形
 
 imgs = [0 for x in range(0, step)]
 labels = [0 for x in range(0, step)]
-GetPictures(gnt, imgs, labels)  # 获取数据集中的step个数据
+labels_str = []
+imgs_test = [0 for x in range(0, step)]
+labels_test = [0 for x in range(0, step)]
+GetPictures(gnt, imgs, labels)  # 获取数据集中的step个训练数据
+GetPictures(gnt, imgs_test, labels_test)  # 获取数据集中的step个测试数据
 table = []
 for i in range(256):
     if i < threshold:
@@ -53,16 +68,27 @@ for i in range(256):
     else:
         table.append(1)
 
-for i in range(0, step):  # 转为二值图
+# 训练数据集
+for i in range(0, step):  # 统一图片大小
     imgs[i] = Image.fromarray(imgs[i])
     imgs[i] = Gray2binary(table, imgs[i])  # 将灰度图转为二值图
     imgs[i] = imgs[i].resize((TargetSize, TargetSize))
     imgs[i] = np.array(imgs[i])
-    labels[i] = i
+    StrL2IntL(labels, labels_str)  # 处理中文标签
+
+# 测试数据集
+for i in range(0, step):  # 统一图片大小
+    imgs_test[i] = Image.fromarray(imgs_test[i])
+    imgs_test[i] = Gray2binary(table, imgs_test[i])  # 将灰度图转为二值图
+    imgs_test[i] = imgs_test[i].resize((TargetSize, TargetSize))
+    imgs_test[i] = np.array(imgs_test[i])
+    StrL2IntL(labels_test, labels_str)  # 处理中文标签
 
 # 改变张量形状
 imgs = np.array(imgs)
 imgs = imgs.reshape((step, TargetSize * TargetSize))
+imgs_test = np.array(imgs_test)
+imgs_test = imgs_test.reshape((step, TargetSize * TargetSize))
 
 # 构建网络
 network = models.Sequential()
@@ -71,5 +97,12 @@ network.add(layers.Dense(step, activation='softmax'))
 
 # 编译
 network.compile(optimizer = 'rmsprop', loss = 'categorical_crossentropy', metrics = ['accuracy'])
+
+# 训练
 labels = to_categorical(labels)
-network.fit(imgs, labels, epochs=100, batch_size=128)
+network.fit(imgs, labels, epochs=times, batch_size=128)
+
+# 测试
+labels_test = to_categorical(labels_test)
+test_loss, test_acc = network.evaluate(imgs_test, labels_test)
+print('test_acc:', test_acc)
