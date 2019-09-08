@@ -1,3 +1,4 @@
 *.log
 *.zip
 __pycache__
+*.h5
