@@ -4,10 +4,12 @@
 import numpy as np
 import struct
 
+
 class GNT:
     def __init__(self, Z, set_name):
         self.Z = Z
         self.set_name = set_name  # 数据集名称
+
     def __iter__(self):
         with self.Z.open(self.set_name) as fp:
             head = True
